@@ -1,0 +1,123 @@
+---
+title: "R for Engineers Handout"
+subtitle: "with RStudio"
+author: "Jeff Newmiller"
+date: "`r Sys.Date()`"
+output:
+  tufte::tufte_handout:
+    citation_package: natbib
+    latex_engine: xelatex
+bibliography: skeleton.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+#options(htmltools.dir.version = FALSE)
+```
+
+# Background
+
+This handout is intended to provide an overview of the prepared materials on using R for engineering calculations and links to useful information on programming in R. Some exposure to basic syntax is assumed, but the intent of these materials is to illustrate how reproducible engineering research can be performed using R and R-Studio. (All of this can be done without RStudio, but it is likely to take rather more effort to get some of it working.)
+
+# Concepts
+
+* Three phases: *Input*, *Analysis*, *Output*
+* *Input* and *Output* use functions with side effects
+* *Analysis* should use functions with no side effects. Such functions often return a (single) list containing results and (possibly) copies of inputs. You may start out experimenting with little steps, but try to wrap up sequences of steps into functions before there are very many steps instead of using copy-paste. Keep track of what you *need* (inputs) and what you are *producing* (outputs).
+* Three graphics systems that don't work together: *Base graphics* is not "stretchy", and it has functions that "paint" graphics on the screen. *Lattice* is stretchy and uses "panel functions" to build plots. *Ggplot* is also stretchy but it depends heavily on "long" data frames and can easily add "layers" with consistent interpretation.
+* RStudio debugging works best if functions are in their own file.
+* Top-level R source file invokes *Input* and *Analysis* statements
+* *Knitr* package is used for stitching R-generated graphics and text together. It is an R code text pre-processor that feeds text output with references to image files to `pandoc` or `latex` to make it pretty. *Knitr* files are a good place to put *Output* phase R code.
+
+# Reference
+
+## R Help
+
+```{r,eval=FALSE}
+help.start() # for general help
+```
+
+The manuals are available through `help.start()`, including two particularly useful ones: *An Introduction to R* and *R Data Import/Export*.
+
+```{r,eval=FALSE}
+help("keyword") # or ?keyword for loaded packages
+help.search("keyword") # or ??keyword for all installed packages
+```
+
+There is also a contributed package `sos` that searches all packages on the *Comprehensive R Archive Network*.
+
+```{r,eval=FALSE}
+install.packages(sos)
+library(sos)
+???keyword
+```
+
+Google will often find questions and answers on stackexchange^[http://stackexchange.com] or in the archives^[https://stat.ethz.ch/pipermail/r-help/] of the `R-help` mailing list.
+
+## R Syntax Reference
+
+```{r}
+# integer vector (sequence)
+v1 <- 1:4
+# floating point vector (sequence)
+v2 <- seq( 3.3, 3.6, by = 0.1 )
+# concatenating multiple vectors
+v3 <- c( 4:5, 4.5, 5.1 )
+# character vector, integer index into builtin vector 
+v4 <- LETTERS[ v1 ]
+# factor vector
+v5 <- factor( v4, levels = c( "B", "A", "C", "D" ) ) 
+# lists can have different kinds of elements
+lst1 <- list( AA = "hello", BB = v3, CC = v1 ) 
+str( lst1 )
+# regular indexing of lists gets a shorter list
+str( lst1[ 1:2 ] ) 
+# element indexing of lists only gets one element, without the name!
+str( lst1[[ 1 ]] )
+# element indexing of lists can also use list names
+str( lst1[[ "AA" ]] )
+# the $ operator is a partial-matching version of [[]]
+str( lst1$A )
+# data frame is a list but all elements must be vectors of same length
+# it is usually best to disable automatic conversion of strings to factors
+DF1 <- data.frame( x = v1, y = v2, z = v3, Lbl = v4, stringsAsFactors = FALSE )
+str( DF1 )
+# extract one column (vector) from data frame two ways
+str( DF1[[ 1 ]] )
+str( DF1[ , 1 ] )
+# data frame with one column
+str( DF1[ , 1, drop = FALSE ] )
+# extract multiple columns of data frame by integer indexing
+str( DF1[ , 1:2 ] )
+# extract multiple columns of data frame by logical indexing
+str( DF1[ , c( TRUE, TRUE, FALSE, FALSE ) ] )
+# extract multiple columns of data frame by name indexing
+str( DF1[ , c( "x", "y" ) ] )
+# extract one or more rows of data frame by integer indexing
+str( DF1[ 1:2, ] )
+# extract multiple columns of data frame by logical indexing
+str( DF1[ DF1$x < 3, ] )
+```
+
+Watch out for forgetting the comma, as that treats the data frame like a list:
+
+```{r}
+str( DF1[ DF1$x < 3 ] )
+# all elements of a matrix must be the same type, unlike data frames
+mat1 <- matrix( v1, ncol = 2 ); mat1
+# elementwise multiplication is the default for matrices
+mat1 * mat1
+# matrix multiplication
+mat1 %*% mat1
+# matrices can have row and column names, though it is not very common
+colnames( mat1 ) <- c( "A", "B" ); rownames( mat1 ) <- c( "C", "D" ); mat1
+```
+
+
+```{r bib, include=FALSE}
+# create a bib file for the R packages used in this document
+knitr::write_bib(c('base', 'rmarkdown'), file = 'skeleton.bib')
+```

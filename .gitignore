@@ -1,0 +1,6 @@
+.Rproj.user
+.Rhistory
+.RData
+data/floods/clean/*
+*_cache
+*_files

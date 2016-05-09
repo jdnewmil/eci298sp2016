@@ -1,0 +1,212 @@
+---
+title: "Simple Data 1"
+author: "Jeff Newmiller"
+date: "4/21/2016"
+output: ioslides_presentation
+autosize: true
+---
+
+<style>
+.codefont pre {
+    font-size: 14px;
+    line-height: 16px;
+}
+</style>
+
+## Overview
+
+This presentation discusses the contents of the `SimpleData1.R` example intended to introduce a basic pattern of programming: the three kinds of tasks.
+
+* Input
+* Analysis (a.k.a. Processing)
+* Output
+
+## Data Flow
+
+```{r,echo=FALSE,results='asis'}
+library(DiagrammeR)
+library(magrittr)
+grViz('
+digraph DataFlow {
+  node [ shape = box ]
+  # data stores
+  infile [ label = "\\"../data/sampledta1/Test1.csv\\"" ]
+  dta
+  {
+    node [ shape = none ]
+    rank = same
+    graphicsdev
+    console
+  }
+  node [ shape = record ]
+  subgraph cluster_input{
+    label = "Input"
+    style = dashed
+    node [ shape = ellipse ]
+    readcsv [ label = "read.csv()" ]
+  }
+  node [ shape = record ]
+  subgraph cluster_analysis{
+    label = "Analysis"
+    style = dashed
+    node [ shape = ellipse ]
+    lm [ label = "lm()" ]
+    node [ shape = box ]
+    dtalm[ label = "dta.lm" ]
+  }
+  node [ shape = record ]
+  subgraph cluster_output{
+    label = "Output"
+    style = dashed
+    node [ shape = ellipse ]
+    printlmsummary [ label = "print(summary.lm())" ]
+    printlm [ label = "print.lm()" ]
+    plotdefault [ label = "plot.default()" ]
+    abline [ label = "abline()" ]
+    printggplot[ label = "print.ggplot()" ]
+    ggplot [ label = "ggplot()..." ]
+    node [ shape = box ]
+    ggp
+  }
+
+  infile -> readcsv
+  readcsv -> dta
+  dta -> plotdefault
+  dta -> ggplot
+  dta -> lm
+  lm -> dtalm
+  dtalm -> printlm
+  dtalm -> printlmsummary
+  dtalm -> abline
+  plotdefault -> graphicsdev
+  abline -> graphicsdev
+  printlm -> console
+  printlmsummary -> console
+  ggplot -> ggp
+  ggp -> printggplot
+  printggplot -> graphicsdev
+}')
+```
+
+## Input
+
+```{r}
+dta <- read.csv( "../data/sampledta1/Test1.csv" )
+```
+
+* Input pulls data from outside of the program (e.g. hard disk or keyboard).
+* CSV files are the easiest way to read data into R.
+
+Potential hiccup: Windows conventionally uses `\` to separate directory and file names, but this is a special character in R literal strings. Either double them up when putting the string into R code (`"C:\\TEMP\\file.csv"`) or use the forward slash alternative (`"C:/TEMP/file.csv"`).
+
+## Analysis
+
+```{r}
+dta.lm <- lm( Reading ~ Seconds, data = dta )
+```
+
+* `lm` is the "linear model" (regression) function. The `dta.lm` object holds the regression results.
+
+* The first argument is a "formula" because of the `~` operator. The left side indicates what `y` is and the right side indicates that a coefficient is needed for `Seconds`. In the absence of a `-1` on the right side, an intercept will be computed.
+
+## Analysis (cont'd.)
+
+* A general feature of analysis functions is that they don't interact with the world directly. Information goes in as parameters, and one "blob" of data is returned as a result. 
+
+* In fact, a good quality analysis function won't have side effects. R makes it difficult (but not impossible) to change global variables from inside functions. Don't try to circumvent this... write your functions to direct all output through the return value, like the `lm` function does.
+
+## Text Output : Data Frame Summary {.codefont}
+
+```{r}
+summary( dta )
+```
+
+Overview of the contents of a data frame.
+
+* Note that output doesn't always work with the output of the analysis step, though it is unusual to direct output to the same place it came from.
+* In this case, the output is to the console, so the analyst can review it.
+
+## Text Output : Linear Model
+
+```{r}
+dta.lm # minimal printout
+```
+
+Default console view of linear regression analysis result.
+
+## Text Output : Linear Model Summary {.codefont}
+
+```{r}
+summary( dta.lm )
+```
+
+Counterintuitively, `summary` yields a more detailed printout than just printing the object does.
+
+## Graphical Output
+
+- There are three systems for generating graphs
+  - Base graphics - like a paintbrush (doesn't resize well)
+  - Lattice graphics - generates `grid` objects that can be printed
+  - Ggplot2 graphics - generates `grid` objects using different syntax
+
+Make sure when you search for graphing functions that you don't
+try to mix and match... use one system at a time.
+
+## Base Graphics {.codefont}
+
+```{r,fig.height=3}
+# R base graphics... like "painting" on the screen
+plot( dta$Seconds, dta$Reading )
+abline( dta.lm, col = "blue" )
+```
+
+## Lattice graphics {.codefont}
+
+```{r,fig.height=3}
+library(lattice)
+p <- xyplot( Reading ~ Seconds, dta
+           , panel = function( x, y ) {
+              panel.xyplot( x, y )
+              panel.abline( dta.lm, col = "blue" ) } )
+print( p )
+```
+
+## Ggplot2 Graphics {.codefont}
+
+```{r,fig.height=3}
+library(ggplot2)
+ggp <- ggplot( dta, aes( x=Seconds, y=Reading ) ) +
+  geom_point() +
+  geom_smooth( method="lm", se=FALSE, color = "blue" )
+print( ggp )
+```
+
+## Ggplot2 Graphics Comments 
+
+```{r,results='hide'}
+ggp <- # ggplot produces a "printable" object
+  ggplot( dta  # default source for data to plot
+        , aes( # define "aesthetic" map from data to display
+               x = Seconds # horizontal position
+             , y = Reading # vertical position
+             ) 
+        ) + # ggplot objects are "added" together
+  geom_point() + # first layer plots data as points
+  geom_smooth( # second layer uses data to generate a "smooth" curve
+               method = "lm" # using linear regression
+             , se = FALSE # don't display confidence band
+             , color = "blue" # specify color of curve
+             )
+# object is not displayed until it is printed
+# print( ggp ) # can be explicit, like this, or by interactive default
+```
+
+## notes
+
+* These three groups of plotting functions can be used consecutively, but they don't work together (you cannot paint an `abline` on a ggplot object).
+
+* Make sure when you search for graphing functions that you don't
+try to mix and match
+
+* My examples will primarily use ggplot2 functions.
+

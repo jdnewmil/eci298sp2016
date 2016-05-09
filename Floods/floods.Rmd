@@ -1,0 +1,59 @@
+---
+title: "Floods Sample Analysis"
+author: "Jeff Newmiller"
+date: "May 8, 2016"
+output: 
+  html_document:
+    fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE )
+source( "floods.R" )
+library(ggplot2)
+```
+
+## Graphs
+
+Trend lines for three reservoirs are given in Figure 1.
+
+```{r, fig.cap="Figure 1. Annual Maximum Inflows and their Rolling 5-Year Mean"}
+ggplot( floodsDFAlong, aes( x = WaterYear, y = value, color = variable ) ) +
+  geom_line() +
+  facet_wrap( ~Reservoir, ncol = 1 )
+```
+
+Figure 2 shows the density (smoothed histogram) for logarithm of annual maximum inflows to visually check for normality.
+
+```{r, fig.cap="Figure 2. Distributions of Log(MaxQ)"}
+ggplot( logFloodsDFA, aes( x = logMaxInflow, color = Reservoir ) ) +
+  geom_density() +
+  xlim( c( 7, 13 ) )
+```
+
+Figure 3 shows a more statistical way to check for normality using quantile-quantile plots. We expect the points to fall on the line if the data conforms with the distribution.
+
+```{r, fig.cap="Figure 3. Q-Q Plots for $\\log{MaxQ}$", fig.height=6}
+# base graphics - see ?par
+oldpar <- par( mfcol = c( 3, 1 ) )
+# first part
+qqnorm( log( floodListA[[ "FOL" ]]$maxInflow ), main = "a) Normal Q-Q Plot for FOL" )
+qqline( log( floodListA[[ "FOL" ]]$maxInflow ) )
+# second part
+qqnorm( log( floodListA[[ "ORO" ]]$maxInflow ), main = "b) Normal Q-Q Plot for ORO" )
+qqline( log( floodListA[[ "ORO" ]]$maxInflow ) )
+# third part
+qqnorm( log( floodListA[[ "SHA" ]]$maxInflow ), main = "c) Normal Q-Q Plot for SHA" )
+qqline( log( floodListA[[ "SHA" ]]$maxInflow ) )
+par( oldpar )
+```
+
+Table 1 shows the extrapolation of 100-year flood level events. The 2006 flood in Folsom stands out from the rest of the flows so much that it exceeds the 100-year expectation derived from the overall data set.
+
+```{r,results='asis'}
+knitr::kable( floodsLongTerm
+            , caption = "Table 1. Long Term Flood Results"
+            , digits = c( 0, 0, 0 )
+            )
+```
+

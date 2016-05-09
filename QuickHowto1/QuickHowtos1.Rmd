@@ -1,0 +1,415 @@
+---
+title: "Quick Howtos 1"
+author: "Jeff Newmiller"
+date: "Saturday, May 7, 2015"
+output: 
+    html_document:
+        fig_caption: yes
+        toc: yes
+        toc_depth: 1
+---
+
+# Use ggplot to draw a single curve
+
+As an example, consider the function
+
+$$f(r) = 1/r$$
+
+We may want to plot values of $r$ in the interval $(1,5)$. Lets make a data frame with one column:
+
+```{r}
+DF1 <- data.frame( r = 1:5 )
+DF1
+```
+
+Now compute the result and put it into a new column in the data frame:
+
+```{r}
+DF1$t <- 1 / DF1$r
+DF1
+```
+
+Now we plot data in `DF1`, mapping `r` to the x-axis, `t` to the y-axis, and drawing lines between the x,y pairs:
+
+```{r,fig.cap="Figure 1-1. Simple line plot"}
+library(ggplot2)
+ggplot( DF1, aes( x = r, y = t ) ) +
+  geom_line()
+```
+
+We can change this to plot points instead:
+
+```{r,fig.cap="Figure 1-2. Simple points plot"}
+ggplot( DF1, aes( x = r, y = t ) ) +
+  geom_point()
+```
+
+or we can overlay them and change the size and color of the points:
+
+```{r,fig.cap="Figure 1-3. Simple line plot with points having fixed size and color"}
+ggplot( DF1, aes( x = r, y = t ) ) +
+  geom_line() +
+  geom_point( size = 3, color = "red" )
+```
+
+but we cannot get a legend for the linesize or color when we specify them on the fly. Rather, we have to map columns of category data to the color and size:
+
+```{r,fig.cap="Figure 1-4. Simple line plot with points and auto legend"}
+DF1$Test <- "First Test"
+DF1$Data <- "Samples"
+DF1
+ggplot( DF1, aes( x = r, y = t ) ) +
+  geom_line() +
+  geom_point( mapping = aes( size = Test, color = Data ) )
+```
+
+Finally, if we want to control how column data are translated into size and colour, we have to make sure discrete variables are setup as factors first, and then adjust their "scales":
+
+```{r,fig.cap="Figure 1-5. Simple line plot with points and modified legend"}
+DF1$Testf <- factor( DF1$Test, levels = "First Test" )
+DF1$Dataf <- factor( DF1$Data, levels = c( "Samples", "Function" ) )
+ggplot( DF1, aes( x = r, y = t ) ) +
+  geom_line() +
+  geom_point( mapping = aes( size = Testf, color = Dataf ) ) +
+  scale_size_manual( name = "Test", values = 3 ) +
+  scale_color_manual( name = "Data", values = "red" )
+```
+
+The values arguments indicate by position the graphical value corresponding to each factor level.
+
+You can read about factors in the *Introduction to R* manual that comes with R. They look a lot like character vectors, but are actually vectors of integers that are automatically used as indexes in a (usually shorter) character vector of "levels". They tend to be useful in the final stages of analysis or display, but are not well suited for combining data sources... for example, don't try concatenating factor vectors.
+
+# Plotting functions with ggplot
+
+While normally functions are evaluated and the data are plotted, sometimes you just want a quick way to overlay what a function looks like on your graph of data points. The `stat_function` function handles this:
+
+```{r,fig.cap="Figure 2-1. Simple line plot with points and modified legend and function"}
+g <- function( x ) {
+  1 / x
+}
+ggplot( DF1, aes( x = r, y = t ) ) +
+  geom_line() +
+  geom_point( mapping = aes( size = Test, color = Data ) ) +
+  stat_function( fun = g, mapping = aes( color = "Function" ) ) +
+  scale_size_manual( values = 3 ) +
+  scale_color_manual( values = c( "blue", "red" ) ) +
+  xlab( "r (km/h)" ) +
+  ylab( "t (h)" )
+```
+
+(Optional detail: notice that factors are not being specified here for size and color, because the legend applies to all data shown on the plot, and the `stat_function` option is automatically generating and adding a bunch of points to the plot, and their size and color must be assigned on the fly. To do this, `ggplot` appends new records to the mapped data with color column values for those records set to "Function". Since concatenating factors does not work in general, the character vectors are concatenated and the unique strings are identified and sorted alphabetically to make the "effective" levels for the color factor. Since it is done internally, there is no way for us to specify the order of those levels outside ggplot. This is why the `stat_function` function is not used very often... better control over the results can be obtained by generating all of the points to plot before giving them to ggplot.)
+
+# Use ggplot to draw multiple curves
+
+Now consider the function
+
+$$f(r) = d/r$$
+
+where $d=1,2,3$ is a distance, $r$ is a rate, and $t=f(r)$ is time. We may want to plot values of $r$ in the interval $(1,5)$ for each value of $d$.
+
+The direct way to make a data frame that contains combinations of x,y points is:
+
+```{r}
+x <- 1:5
+DF2 <- data.frame( d = rep( c( 1, 2, 3 )
+                          , each = length( x ) )
+                 , r = c( x, x, x )
+                 )
+str( DF2 )
+head( DF2 )
+```
+
+Now we have a data frame with all combinations of the inputs needed for the function. (Note that there are more compact ways to build such combinations of inputs, such as the `expand.grid` function that will be discussed later.) We can augment this data frame with a new column that contains the computed results:
+
+```{r}
+f <- function( r, d ) {
+    d/r
+}
+DF2$t <- f( DF2$r, DF2$d )
+head( DF2 )
+```
+
+Now we have a data frame with both input values and the corresponding output values. Now lets make a first try at the graph:
+
+```{r,fig.cap="Figure 3-1. Multi-curve continuous color"}
+ggplot( DF2, aes( x = r, y = t, color = d ) ) +
+  geom_line()
+```
+
+Not quite what we would have hoped. The problem is that we have mapped color to a continuous variable (numeric). We can fix this by changing `d` to a discrete "factor" variable:
+
+```{r}
+DF2$df <- factor( DF2$d )
+str( DF2 )
+```
+
+Now plot a second try using the factor:
+
+```{r,fig.cap="Figure 3-2. Multi-curve factor mapped to color"}
+ggplot( DF2, aes( x = r, y = t, color = df ) ) +
+    geom_line()
+```
+
+The sequence of values in the legend is controlled by the sequence of levels used in the factor, so:
+
+```{r}
+DF2$df <- factor( as.character( DF2$d ), levels = c( "3", "1", "2" ) )
+str( DF2 )
+```
+
+and plot a third try:
+
+```{r,fig.cap="Figure 3-3. Multi-curve factor with explicit levels mapped to color"}
+ggplot( DF2, aes( x = r, y = t, color = df ) ) +
+    geom_line()
+```
+
+The colors are mapped by default using a `scale_colour_discrete` function. However, we can manually assign colors according to the sequence of the levels in the factor:
+
+```{r,fig.cap="Figure 3-4. Multi-curve with manual color scale"}
+ggplot( DF2, aes( x = r, y = t, color = df ) ) +
+    geom_line() +
+    scale_colour_manual( values = c( "green", "red", "black" ) )
+```
+
+We can change the label on the legend by modifying the name of the colour scale. We can also restore a more sensible order to the coefficients, embellish the axis labels, and increase the line width:
+
+```{r,fig.cap="Figure 3-5. Multi-curve with manual color scale and explicit scale titles"}
+DF2$df <- factor( DF2$d )
+str( DF2 )
+ggplot( DF2, aes( x = r, y = t, color = df ) ) +
+    geom_line( size = 2 ) +
+    scale_colour_manual( name = "Distance (km)"
+                       , values = c( "red", "orange", "green", "blue", "black" ) ) +
+    xlab( "Speed (km/h)" ) +
+    ylab( "Time (h)" )
+```
+
+# Use `expand.grid` to make the input variable columns
+
+The `expand.grid` function makes all combinations of the values in two or more vectors appear in the rows of a data frame. For example:
+
+```{r}
+expand.grid( d = c( 0, 1 ), b = c( 0, 2, 4 ) )
+```
+
+So we could easily make lots of points at which a function is to be evaluated:
+
+```{r}
+DF3 <- expand.grid( d = 1:5, r = (10:500)/10 )
+DF3$df <- factor( DF3$d )
+str( DF3 )
+```
+
+Then compute the function values and plot:
+
+```{r,fig.cap="Figure 4-1. Curves generated from `expand.grid` input"}
+DF3$t <- with( DF3, f( r, d ) )
+ggplot( DF3, aes( x = r, y = t, color = df ) ) +
+    geom_line() +
+    scale_colour_manual( name = "Distance (km)"
+                       , values = c( "red", "orange", "green", "blue", "black" ) ) +
+    xlab( "Speed (km/h)" ) +
+    ylab( "Time (h)" )
+```
+
+# Find implicit solution using root solver `uniroot`
+
+Suppose we want to look at how solutions to the quadratic equation change as the coefficients change. The equation is:
+
+$$x^2 + {BA} x + {CA} = 0$$
+
+so we will plot solutions versus $CA$ in $[-5,1]$, for a couple of values of $BA$, say $\{1, 2, 3, 4\}$. First, write a function that expresses the left side of that expression:
+
+```{r}
+E <- function( x, CA, BA ) {
+    x^2 + BA * x + CA
+}
+```
+
+Note that by basic calculus this function `E` has an extremum at $x= - \frac{BA}{2}$, but we won't always be able to figure this out analytically so often a fixed search domain has to be chosen somehow. To get a clue, we can plot `E`:
+
+```{r,fig.cap="Figure 5-1. Exploratory plot of function $E$ where $BA=1$ and $CA=-1$"}
+x <- seq( -5, 5, 0.1 )
+# "quick" plot version of ggplot, works with x and y vectors
+qplot(x, E( x, -1, 1 ) ) + geom_hline( yintercept = 0, colour = "blue" )
+```
+
+and note that the minimum occurs at $x<0$ and when $CA=-5$ the minimum is more negative than the left solution was in the first plot, so we while the rightmost solution is positive in these cases, in general we should make the left starting point of our interval adjust with the parameters.
+
+```{r,fig.cap="Figure 5-2. Exploratory plot of function $E$ where $BA=5$ and $CA=-5$"}
+x <- seq( -5, 5, 0.1 )
+qplot(x, E( x, -5, 5 ) ) + geom_hline( yintercept = 0, colour = "blue" )
+```
+
+Now write a function that returns the right-most (greatest value) zero of `E`, which is also the solution to the original equation:
+
+```{r}
+f <- function( CA, BA ) {
+    uniroot( E, c( -BA/2, 5 ), CA = CA, BA = BA )$root
+}
+f( -1, 1 )
+```
+
+We can set up a data frame of possible input combinations as before:
+
+```{r}
+DF4 <- expand.grid( BA = 1:4, CA = seq( -5, -1, 0.1))
+str( DF4 )
+```
+
+Now `f` is a function that expects a single value of `CA` and a single value of `BA`, since uniroot only works on one solution at a time. This means we can no longer use the vectorized assignment:
+
+ 
+```{r}
+## won't work
+# DF4$x <- with( DF4, f( CA, BA ) )
+```
+
+but we can use a loop to call it one row at a time:
+
+```{r}
+DF4$x <- NA # make room for all the answers
+for ( i in seq.int( nrow( DF4 ) ) ) {
+    DF4[ i, "x" ] <- f( DF4[ i, "CA" ], DF4[ i, "BA" ] )
+}
+```
+
+and then plot the results:
+
+```{r,fig.cap="Figure 5-3. For-loop version of quadratic equation solutions"}
+DF4$BAf <- factor( DF4$BA )
+ggplot( DF4, aes( x = CA, y = x, colour = BAf ) ) +
+    geom_line( size = 3 )
+```
+
+# Rowwise processing with `dplyr`
+
+The notation in the for loop can get kind of cumbersome. There is a relatively new method of clarifying how these steps are performed based on the `dplyr` package.
+
+The basic principle is that the data "flows" from a starting point to the end of a sequence of operations. `dplyr` uses some sophisticated tricks to figure out all the `DF5$` stuff for you (and to be fair, while it is easy to read when it works the `dplyr` rules of evaluation can surprise you while you are composing it).
+
+To illustrate this method the intermediate results will be shown first, and the complete calculation will be shown below.
+
+First, a basic `expand.grid` generates all combinations of `BA` and `CA`:
+
+```{r}
+str( expand.grid( BA = 1:4, C = seq( -5, -1, 0.1 ) ) ) # construct the inputs
+```
+
+Next we introduce the `%>%` pipe operator and `mutate` function from the `dplyr` package:
+
+```{r}
+library(dplyr)
+str(   expand.grid( BA = 1:4, CA = seq( -5, -1, 0.1 ) ) # construct the inputs
+   %>% mutate( BAf = factor( BA ) ) # vectorwise calculation of a new column
+   )
+```
+
+The `mutate` function lets us modify or create columns based on existing columns or any other variables in the working environment.
+
+Next, we modify the resulting data frame so that later operations will apply one row at a time:
+
+```{r}
+str(   expand.grid( BA = 1:4, CA = seq( -5, -1, 0.1 ) ) # construct the inputs
+   %>% mutate( BAf = factor( BA ) ) # vectorwise calculation of a new column
+   %>% rowwise  # mark results obtained so far to be handled row-by-row
+   )
+```
+
+The details are not important to using `dplyr`, but you can tell that the data frame has been changed so that `dplyr` functions can tell that they need to work on this data frame differently than usual.
+
+Now we apply another mutate to create the `x` column one value at a time:
+
+```{r}
+str(   expand.grid( BA = 1:4, CA = seq( -5, -1, 0.1 ) ) # construct the inputs
+   %>% mutate( BAf = factor( BA ) ) # vectorwise calculation of a new column
+   %>% rowwise  # mark results obtained so far to be handled row-by-row
+   %>% mutate( x = f( CA, BA ) ) # rowwise calculation of a new column
+   )
+```
+
+and the column is created in one line instead of a whole `for` loop.  However, the rowwise modification is still active. Since this tends to slow future `dplyr` operations down, and some non-`dplyr` functions don't work well with the modified data frame, we convert it back to a normal data frame again:
+
+```{r}
+str(   expand.grid( BA = 1:4, CA =seq( -5, -1, 0.1 ) ) # construct the inputs
+   %>% mutate( BAf = factor( BA ) ) # vectorwise calculation of a new column
+   %>% rowwise  # mark results obtained so far to be handled row-by-row
+   %>% mutate( x = f( CA, BA ) ) # rowwise calculation of a new column
+   %>% as.data.frame # optionally convert result back to a plain data frame
+   )
+```
+
+Thus, the previous example can be boiled down to:
+
+```{r,fig.cap="Figure 6-1 Rowwise version of `dplyr` quadratic equation solutions"}
+DF5 <- (   expand.grid( BA = 1:4, CA = seq( -5, -1, 0.1 ) ) # construct the inputs
+       %>% mutate( BAf = factor( BA ) ) # vectorwise calculation of a new column
+       %>% rowwise  # mark results obtained so far to be handled row-by-row
+       %>% mutate( x = f( CA, BA ) ) # rowwise calculation of a new column
+       %>% as.data.frame # optionally convert result back to a plain data frame
+       )
+ggplot( DF5, aes( x = CA, y = x, colour = BAf ) ) +
+    geom_line( size = 3 ) +
+    scale_color_discrete( name = "BA" )
+```
+
+Now that is very little code to do quite a lot of work!
+
+# Vectorizing
+
+Some algorithms like uniroot need to be applied to one scalar value at a time. However, it can get tedious to keep writing for loops every time you want to use such an algorithm. The solution is to make a function that implements the for loop:
+
+```{r}
+fv1 <- function( CA, BA ) {
+  stopifnot( length( CA ) == length( BA ) )
+  x <- rep( NA, length( CA ) ) # make room for all the answers
+  for ( i in seq.int( length( CA ) ) ) {
+    x[ i ] <- f( CA[ i ], BA[ i ] )
+  }
+  x # last expression gets returned - avoid using return(x) at the end of the function
+}
+```
+
+Now we can compute a new column in a data frame in one step:
+
+```{r}
+DF4$x1 <- with( DF4, fv1( CA, BA ) ) # this works
+head( DF4 )
+identical( DF4$x, DF4$x1 ) # test whether result is the same
+```
+
+In fact, this pattern is common enough that a function has been included in R that does it for us: the `Vectorize` function. This function accepts the original function and the names of the scalar arguments, and returns to us a new function that can be called with vector arguments.
+
+```{r}
+fv2 <- Vectorize( f, c( "CA", "BA" ) )
+DF4$x2 <- with( DF4, fv2( CA, BA ) ) # this works
+head( DF4 )
+identical( DF4$x, DF4$x2 ) # test whether result is the same
+```
+
+and the previous `dplyr` solution can be shortened:
+
+```{r,fig.cap="Figure 7-1 Vectorwise `dplyr` version of quadratic equation solutions"}
+DF5 <- (   expand.grid( BA = 1:4, CA = seq( -5, -1, 0.1 ) ) # construct the inputs
+       %>% mutate( BAf = factor( BA ) # vectorwise calculation of a new column
+                 , x = fv2( CA, BA ) # "vectorwise" calculation of a new column
+                 )
+       %>% as.data.frame # optionally convert result back to a plain data frame
+       )
+ggplot( DF5, aes( x = CA, y = x, colour = BAf ) ) +
+    geom_line( size = 3 ) +
+    scale_color_discrete( name = "BA" )
+```
+
+Keep in mind that `Vectorize`-ed form of the function does not run any faster than the `for` loop version would, but it is much easier to use it in conjunction with the usual vectorwise data that R programmers work with. The speed improvement that is normally associated with vectorized functions arises from the typically-faster processing that compiled vectorwise code provides.
+
+# Handling Time Data
+
+R has no concept of time independent of date, mostly because the number and numbering of hours in a day is different when daylight savings time starts and stops.
+
+If you are dealing with date data (no time of day), the `Date` type can be used without concern about timezones. However, if time of day is part of your analysis then the base R method for handling that are the `POSIXlt` and `POSIXct` types that follow the (surprise) POSIX standard for timekeeping, and the `difftime` type for time intervals (time arithmetic). There are some packages that can be used if you want to ignore timezone idiosyncrasies (`zoo` and `chron` are a couple).
+
+The rest of this discussion focuses on `POSIXct`, with a little `POSIXlt` and `difftime` as well.
+
+**TODO**
