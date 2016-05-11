@@ -30,6 +30,9 @@ floodList <- lapply( reservoirs
 names( floodList ) <- reservoirs
 
 # optional cleaned data output to files
+if ( !dir.exists( cleandtadir ) ) {
+  stopifnot( dir.create( cleandtadir ) )
+}
 for ( r in reservoirs ) {
   write.csv( floodList[[ r ]], makeReservoirFname( r, cleandtadir ), row.names = FALSE )
 }
