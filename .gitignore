@@ -4,3 +4,4 @@
 data/floods/clean/*
 *_cache
 *_files
+*.lp

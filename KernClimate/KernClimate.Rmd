@@ -1,0 +1,161 @@
+---
+title: "Kern Reservoir Optimization"
+author: "Jeff Newmiller"
+date: "5/15/2016"
+output:
+    html_document:
+        fig_captions: true
+---
+
+```{r,echo=FALSE,message=FALSE}
+library(knitr)
+opts_chunk$set( echo=FALSE, message=FALSE, fig.height=4, fig.width=7 )
+source( "KernClimate.R" )
+```
+
+# Background
+
+Scheduling reservoir water releases is tricky, because if you release too much then if no precipitation comes the reservoir will run dry, and if you hold too much then it won't hold back storm surges (flood control). This problem considers the perfect-knowledge optimization of reservoir releases in order to identify the maximum *firm yield* amount that can be counted on each year.
+
+# Input Data
+
+A two-season inflows table (note that flood season flows are lower than irrigation season flows because this data is from a high elevation were most preciptation is snow-pack):
+
+* **Year** : Water season year of water inflows (Calendar year of beginning of season)
+* **Flood** : Rainy season water inflow (thousand acre-feet)
+* **Irrigation** : Dry season water inflow (thousand acre-feet)
+
+```{r,results='asis'}
+kable( inflows
+     , caption = "Table 1. Inflows"
+     )
+```
+
+A seasonal information table with columns:
+
+* **Season** : Distinct periods within the year
+* **Dist** : Fraction of the annual release permitted in this season
+* **EndCap** : Maximum water to store in this season
+* **Evap** : Amount of water evaporated in this season (thousand acre-feet)
+* **PumpCoef** : Coefficient for pumping penalty
+* **PumpExp** : Exponent for pumping penalty
+* **StartMo** : Month of year in which this season starts
+* **DurationMo** : Duration of season in months
+* **CalendarYrOffset** : If the beginning of this season is in the year following the start of the water year, this is 1, zero otherwise. (years)
+
+```{r,results='asis'}
+kable(caps,caption = "Table 2. Seasonal Information" )
+```
+
+
+```{r,fig.cap="Figure 1. Per-Season Inflows"}
+library(ggplot2)
+DF <- (   inflowsl
+      %>% select( EndDate, Inflow, EndCap )
+      %>% gather( Type, value, -EndDate )
+      )
+ggplot( DF, aes( x = EndDate, y=value, color=Type ) ) +
+    geom_step(direction = "vh" ) +
+    xlab( "Time" ) +
+    ylab( "Volume (TAF)" ) +
+    scale_color_manual( values=c( "red", "blue" ) )
+```
+
+# Solution
+
+- $w_k$ is the amount of spillage (unknown)
+- $q$ is the annual firm yield (unknown)
+- $N$ is the total number of time intervals (seasons)
+- $c_k$ is the storage capacity of the reservoir at the end of that interval (thousand acre-feet, or TAF)
+- $k$ is the index for time intervals starting at 1
+- $j$ is the sub-index for time intervals counting from 1 to $k$ or 1 to $N$
+- $i_k$ is inflow in interval $k$ (TAF) (see `Flood` and 'Irrigation` in Table 1)
+- $e_k$ is evaporation during interval $k$ (TAF) (see `Evap` in Table 2)
+- $D_k$ is water distribution fraction for interval $k$ (TAF) (see `Dist` in Table 2).
+- $s_k$ is amount in storage at the end of interval $k$ (TAF)
+- $s_0$ is amount in storage initially (TAF)
+
+- Constraints
+    + $N$ maximum storage capacity constraint equations 1 to $k$:
+    $$ s_0 + \sum_{j=1}^{k} i_j - \sum_{j=1}^{k} w_j - \sum_{j=1}^{k} e_j - \sum_{j=1}^{k} D \cdot q \leq c_k$$
+    or
+    $$ \sum_{j=1}^{k} w_j + \left( \sum_{j=1}^{k} D_j \right) \cdot q \geq s_0 + \sum_{j=1}^{k} i_j - \sum_{j=1}^{k} e_j - c_k$$
+    + $N$ minimum (0) storage capacity
+    $$ \sum_{j=1}^{k} w_j + \left( \sum_{j=1}^{k} D_j \right) \cdot q \leq s_0 + \sum_{j=1}^{k} i_j - \sum_{j=1}^{k} e_j$$
+    + 1 excess + releases must total less than or equal to all inflows
+    $$\sum_{j=1}^{N} w_j + \left( \sum_{j=1}^{N} D_j \right) \cdot q \leq \sum_{j=1}^{N} i_j - \sum_{j=1}^{N} e_j$$
+
+- Variables
+    + $N$ spill values $w_k$
+    + 1 annual release value $q$
+
+We can pre-compute cumulative sums to fill in the equations:
+
++ $\mathit{Inflow} = i_k$
++ $\mathit{EndCap} = c_k$
++ $\mathit{CumInflow} = \sum_{j=1}^{k} i_k$
++ $\mathit{CumStgMin} =  s_0 + \mathit{CumInflow} - \sum_{j=1}^k e_j$
++ $\mathit{CumStgMax} =  \mathit{CumStgMin} - \mathit{EndCap}$
++ $\mathit{CumDist} = \sum_{j=1}^k D_j$
+
+If we were to solve the first four seasons, the equations would look like:
+
+$$\begin{array}{ccccccccccl}
+w_1 & + &     &   &     & + &     & + & \mathit{CumDist}_1 \cdot q & \leq & \mathit{CumStgMax}_1 \\
+w_1 & + & w_2 & + &     & + &     & + & \mathit{CumDist}_2 \cdot q & \leq & \mathit{CumStgMax}_2 \\
+w_1 & + & w_2 & + & w_3 & + &     & + & \mathit{CumDist}_3 \cdot q & \leq & \mathit{CumStgMax}_3 \\
+w_1 & + & w_2 & + & w_3 & + & w_4 & + & \mathit{CumDist}_4 \cdot q & \leq & \mathit{CumStgMax}_4 \\
+w_1 & + &     &   &     & + &     & + & \mathit{CumDist}_1 \cdot q & \geq & \mathit{CumStgMin}_1 \\
+w_1 & + & w_2 & + &     & + &     & + & \mathit{CumDist}_2 \cdot q & \geq & \mathit{CumStgMin}_2 \\
+w_1 & + & w_2 & + & w_3 & + &     & + & \mathit{CumDist}_3 \cdot q & \geq & \mathit{CumStgMin}_3 \\
+w_1 & + & w_2 & + & w_3 & + & w_4 & + & \mathit{CumDist}_4 \cdot q & \geq & \mathit{CumStgMin}_4 \\
+w_1 & + & w_2 & + & w_3 & + & w_4 & + & \mathit{CumDist}_4 \cdot q & \geq & \mathit{CumInflow}_4
+\end{array}$$
+
+where the first four equations capture the constraint that the amount of water that can be in the reservoir at the end of interval $k$ must be less than $c_k$, the next four capture the fact that the minimum amount of water that can be in the reservoir at the end of interval $k$ cannot be less than zero, and the last equation captures the fact that the total amount of inflows over the analysis period cannot be more than the total outflows over the analysis period.
+
+The actual problem has 413 equations and 207 variables. The equations are typically represented as a matrix of left-hand-side coefficients and a vector of inequality limits on the right-hand side. The linear programming functions help build the large matrix programmatically, and the `solve` function handles the heavy lifting of finding a solution.
+
+# Firm yield
+
+The firm yield is `r get.objective( lpmodel )` TAF, solved by linear programming.
+
+```{r,fig.cap="Figure 3. Cumulative Inflow and Outflow"}
+DF <- (   flowsl
+      %>% select( EndDate, CumInflow, CumOutFlow )
+      %>% gather( Type, value, -EndDate )
+      )
+ggplot( DF, aes( x=EndDate, y=value, color=Type ) ) +
+    geom_line() +
+    xlab( "Time" ) +
+    ylab( "Volume (TAF)" ) +
+    scale_color_manual( values=c( "blue", "red" ) )
+```
+
+Storage is drained at the end of the dry season in 2015.
+
+```{r,fig.cap="Figure 4. Storage at Season End"}
+DF <- (   flowsl
+      %>% select( EndDate, EndCap, Storage )
+      %>% gather( Type, value, -EndDate )
+      )
+ggplot( DF, aes( x=EndDate, y=value, shape=Type ) ) +
+    geom_point( size=1 ) +
+    geom_line( alpha = 0.2 ) +
+    xlab( "Time" ) +
+    ylab( "Volume (TAF)" )
+```
+
+Spilling by the end of the irrigation season in order to prepare for flood control is quite common.
+
+```{r,fig.cap="Figure 5. Spills"}
+DF <- (   flowsl
+      %>% select( EndDate, EndCap, Storage, Season )
+      %>% gather( Type, value, -c( EndDate, Season ) )
+      )
+ggplot( flowsl, aes( x=EndDate, y=Excess, colour = Season ) ) +
+    geom_point( size=1 ) +
+    geom_line( alpha = 0.2 ) +
+    xlab( "Time" ) +
+    ylab( "Spill (TAF)" )
+```
