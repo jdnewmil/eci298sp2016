@@ -4,7 +4,10 @@ library(dplyr)
 library(tidyr)
 library(RcppRoll)
 
-# setwd( ".." )
+# To build this file
+# If you are not already in the main project directory
+# setwd('..')
+# Once in the main project directory
 # setwd( "Floods" )
 
 reservoirs <- c( 'FOL', 'ORO', 'SHA' )

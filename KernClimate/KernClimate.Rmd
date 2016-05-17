@@ -7,6 +7,15 @@ output:
         fig_captions: true
 ---
 
+```{r, include=FALSE}
+# To build this file
+# If you are not already in the main project directory
+# setwd('..')
+# Once in the main project directory
+# setwd('KernClimate')
+
+```
+
 ```{r,echo=FALSE,message=FALSE}
 library(knitr)
 opts_chunk$set( echo=FALSE, message=FALSE, fig.height=4, fig.width=7 )
