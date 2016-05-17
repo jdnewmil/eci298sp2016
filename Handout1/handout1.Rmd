@@ -2,17 +2,25 @@
 title: "R for Engineers Handout"
 subtitle: "with RStudio"
 author: "Jeff Newmiller"
-date: "`r Sys.Date()`"
+date: "May 16, 2016"
 output:
   tufte::tufte_handout:
     citation_package: natbib
     latex_engine: xelatex
-bibliography: skeleton.bib
+bibliography: Rpackages.bib
 link-citations: yes
 ---
 
 ```{r setup, include=FALSE}
+
+# To build this file
+# If you are not already in the main project directory
+# setwd('..')
+# Once in the main project directory
+# setwd('Handout1')
+
 library(tufte)
+library(bibtex)
 # invalidate cache when the tufte version changes
 knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
 #options(htmltools.dir.version = FALSE)
@@ -21,6 +29,46 @@ knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
 # Background
 
 This handout is intended to provide an overview of the prepared materials on using R for engineering calculations and links to useful information on programming in R. Some exposure to basic syntax is assumed, but the intent of these materials is to illustrate how reproducible engineering research can be performed using R and R-Studio. (All of this can be done without RStudio, but it is likely to take rather more effort to get some of it working.)
+
+# Before you start
+
+You will need to clone the course materials from GitHub so that you can follow along in class. Within RStudio start a new project, select "Version Control", select "Git", in the following fields:
+
+* Repository URL: https://github.com/jdnewmil/eci298sp2016.git
+
+* Project directory name: `eci298sp2016`
+
+* Create project as subdirectory of: *directory of your choice*
+
+You will also need to install a series of contributed packages that are used in these study materials. For example to install the `ggplot2` package from the R console type:
+
+```{r, eval=FALSE}
+install.packages('ggplot2')
+```
+
+The packages you will need to install are:
+
+* `ggplot2` [@ggplot2] 
+* `sos` [@sos] 
+* `dplyr` [@dplyr]
+* `tidyr` [@tidyr]
+* `zoo` [@zoo]
+* `lpSolveAPI` [@lpSolveAPI]
+* `RcppRoll` [@RcppRoll]
+
+Optional packages:
+
+* `DiagrammeR` [@DiagrammeR]
+* `tufte` [@tufte]
+
+The following packages included in R are also used (do not need to be installed separately):
+
+* `base` [@base]
+* `lattice` [@lattice]
+* `stats` [@base]
+
+
+
 
 # Concepts
 
@@ -98,7 +146,7 @@ str( DF1[ , c( TRUE, TRUE, FALSE, FALSE ) ] )
 str( DF1[ , c( "x", "y" ) ] )
 # extract one or more rows of data frame by integer indexing
 str( DF1[ 1:2, ] )
-# extract multiple columns of data frame by logical indexing
+# extract multiple rows of data frame by logical indexing
 str( DF1[ DF1$x < 3, ] )
 ```
 
@@ -117,7 +165,26 @@ colnames( mat1 ) <- c( "A", "B" ); rownames( mat1 ) <- c( "C", "D" ); mat1
 ```
 
 
+# Resources
+
+* Cheatsheets: RMarkdown, dplyr, ggplot2, Shiny, RStudio
+(https://www.rstudio.com/resources/cheatsheets/)
+
+# Session Information
+
+```{r, echo=FALSE, results= 'asis'}
+toLatex(sessionInfo(), locale = TRUE)
+```
+
+
 ```{r bib, include=FALSE}
 # create a bib file for the R packages used in this document
-knitr::write_bib(c('base', 'rmarkdown'), file = 'skeleton.bib')
+#knitr::write_bib(c('base', 'rmarkdown'), file = 'skeleton.bib')
+#cat(paste(unlist(lapply(c('lattice', 'ggplot2'), function(x){toBibtex(citation(x))})),collapse = "\n"), file = 'skeleton.bib')
+write.bib(c('lattice', 'ggplot2', 'sos', 'dplyr', 'tidyr', 'zoo', 'lpSolveAPI', 'RcppRoll', 'DiagrammeR', 'tufte', 'base'))
+bib <- readLines('Rpackages.bib')
+bib <- gsub('lp_', 'lp\\_',bib, fixed = TRUE)
+cat(paste(bib,collapse = '\n'), file = "Rpackages.bib")
 ```
+
+

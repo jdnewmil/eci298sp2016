@@ -1,7 +1,11 @@
 # SimpleData1.R
 
-# setwd( ".." )
-# setwd( "SimpleData1" )
+# To build this file
+# If you are not already in the main project directory
+# setwd('..')
+# Once in the main project directory
+# setwd('SimpleData1')
+
 
 # import
 dta <- read.csv( "../data/sampledta1/Test1.csv" )

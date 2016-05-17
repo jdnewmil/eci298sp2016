@@ -4,6 +4,13 @@ library(lpSolveAPI)
 library(dplyr)
 library(tidyr)
 
+# To build this file
+# If you are not already in the main project directory
+# setwd('..')
+# Once in the main project directory
+# setwd('KernClimate')
+
+
 inflowFname <- "../data/KernClimate/KernClimate.csv"
 # read first 9 lines to get information about the simulation
 inflowhdr <- read.csv( inflowFname

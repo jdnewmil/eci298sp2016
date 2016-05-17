@@ -9,6 +9,8 @@ output:
         toc_depth: 1
 ---
 
+
+
 # Use ggplot to draw a single curve
 
 As an example, consider the function

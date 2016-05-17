@@ -7,6 +7,15 @@ output:
     fig_caption: yes
 ---
 
+```{r, include=FALSE}
+# To build this file
+# If you are not already in the main project directory
+# setwd('..')
+# Once in the main project directory
+# setwd( "Floods" )
+```
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE )
 source( "floods.R" )
