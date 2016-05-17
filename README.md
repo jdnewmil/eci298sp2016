@@ -2,7 +2,7 @@
 
 *Jeff Newmiller*
 
-Materials for describing R for Engineering. This is an RStudio project directory, with sub-directories corresponding to two sample analyses and two reference documents.
+Materials for describing R for Engineering for a self-study seminar in Programming for Civil Engineers. This is an RStudio project directory, with sub-directories corresponding to two sample analyses and two reference documents.
 
 It is assumed that Day 1 will have covered starting RStudio and basic R syntax.
 
@@ -18,9 +18,15 @@ This is a very simple analysis that loads a CSV file, performs a linear regressi
 
 * Packages used: `lattice`, `ggplot2` for the R file. Also `DiagrammeR` and `magrittr` for the Rmd file (optional).
 
+### KernClimate
+
+This is a fairly involved analysis that uses Linear Programming to identify the firm yield for a series of seasonal water flows. The R file forms the *input* and *analysis* phases, and the Rmd file generates output as an HTML file. The problem is a subset of a problem often posed by Dr. Jay Lund at UC Davis.
+
+* Packages used: `ggplot2`, `dplyr`, `lpSolveAPI`, and `tidyr` for the R file. `ggplot2` and `knitr` for the Rmd file.
+
 ### Floods
 
-This is a more detailed example of a complete analysis with a separate functions file, top-level R file to create global data and results objects (*Input* and *Analysis* phases), and an RMarkdown file that implements the *Output* phase of the analysis. The HTML file is the result.
+This is a fairly detailed example of a complete analysis with a separate functions file, top-level R file to create global data and results objects (*Input* and *Analysis* phases), and an RMarkdown file that implements the *Output* phase of the analysis. The HTML file is the result.
 
 This code follows the example of the sample Python code provided by Dr. Jon Herman earlier in this course.
 
@@ -28,13 +34,20 @@ This code follows the example of the sample Python code provided by Dr. Jon Herm
 
 ## Reference Documents
 
-The other two directories contain supporting information.
+The other three directories contain supporting information.
 
 ### QuickHowto1
 
 The QuickHowto1.html file describes how to accomplish several focussed tasks using R.
 
 * Packages used: `ggplot2`, `dplyr` (optional).
+
+### QuickHowto2
+
+The QuickHowto2.html file gives some simplified examples of using the `ave`, `diff` and `cumsum` functions as well as the `tidyr` functions `spread` and `gather`.
+
+* Packages used: `tufte`, `ggplot2`, `dplyr` and `tidyr`.
+
 
 ### Handout1
 

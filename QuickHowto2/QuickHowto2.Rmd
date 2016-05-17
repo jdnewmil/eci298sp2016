@@ -1,0 +1,382 @@
+---
+title: "Quick Howto 2"
+subtitle: "Vectorwise Calculations"
+author: "Jeff Newmiller"
+date: "14 May 2016"
+output:
+  tufte::tufte_handout:
+    citation_package: natbib
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(echo = TRUE)
+options(htmltools.dir.version = FALSE)
+library(ggplot2)
+```
+
+# The `ave` function
+
+If you have an existing vector of data
+
+```{r}
+X <- c( 1, 2, 3, 4, 5, 6, 7, 8 )
+```
+
+and another vector that identifies which *groups* the values in the first vector are in
+
+```{r}
+G <- c( 1, 1, 1, 1, 2, 2, 2, 1 )
+```
+
+We could find the mean for group 1
+
+```{r}
+X[ 1 == G ]
+mean( X[ 1 == G ] )
+```
+
+and for group 2
+
+```{r}
+X[ 2 == G ]
+mean( X[ 2 == G ] )
+```
+
+but if we want to keep our original vector lengths and do both, we can use `ave`:
+
+```{r}
+ave( X, G )
+```
+
+so those vectors would all fit in a data frame:
+
+```{r}
+DF1 <- data.frame( Pos = seq_along( X ), X, G )
+DF1$GroupMeans <- with( DF1, ave( X, G ) )
+DF1
+```
+```{r Ave1, fig.margin=TRUE,fig.cap="Group Mean by Ave",echo=FALSE}
+ggplot( DF1, aes( x = Pos, y = X, color = as.factor( G ) ) ) +
+    geom_point() +
+    geom_bar( mapping = aes( y = GroupMeans
+                           , fill = as.factor( G )
+                           )
+            , stat = "identity"
+            , color = NA
+            , alpha = 0.3
+            ) +
+    scale_fill_discrete( name = "G" ) +
+    scale_color_discrete( name = "G" )
+```
+
+as opposed to getting the means as one result per group:
+
+```{r}
+# using base R
+# remember a data frame is a list, and indexing without a comma
+# returns another data frame/list
+DF2a <- aggregate( DF1[ "X" ] # list of columns to aggregate
+                 , DF1[ "G" ] # list of columns to group by
+                 , FUN = mean # what to do to each column
+                 )
+DF2a
+# using dplyr
+library( dplyr )
+DF2b <- (   DF1
+        %>% group_by( G )
+        %>% summarise( X = mean( X ) )
+        %>% as.data.frame
+        )
+DF2b
+```
+
+
+# Using `diff` to find transitions
+
+Suppose we know some (fictional) water stage values:
+
+```{r}
+DF3 <- read.table( text = 
+"Dt         Stage
+1990-01-01    9.0
+1990-01-02   10.0
+1990-01-03   11.0
+1990-01-04   11.0
+1990-01-05   10.0
+1990-01-06    9.0
+1990-01-07    8.0
+1990-01-08    9.0
+1990-01-09   10.0
+1990-01-10   11.0
+1990-01-11   12.0
+1990-01-12   11.0
+1990-01-13   10.0
+1990-01-14    9.0
+1990-01-15    8.0
+", header = TRUE, as.is = TRUE )
+DF3$Dt <- as.Date( DF3$Dt )
+```
+```{r Stage1, fig.margin=TRUE,fig.cap="Raw (Fake) Stage Data",echo=FALSE,fig.height=2}
+ggplot( DF3, aes( x=Dt, y=Stage ) ) +
+    geom_point() +
+    geom_hline( yintercept = 10
+              , color = "red"
+              )
+```
+
+and we want to identify and group contiguous time intervals when stage is greater than 10.
+
+Start by identifying when the level is exceeded:
+
+```{r}
+DF3$F <- 10 < DF3$Stage
+```
+
+```{r Stage1a, fig.margin=TRUE,fig.cap="Level Exceeded Trend",echo=FALSE,fig.height=2}
+ggplot( DF3, aes( x=Dt, y=as.integer( F ) ) ) +
+    geom_step( direction = "hv" ) +
+    ylab( "F (1=flood)" )
+```
+
+Now identify the rising edge of `F`:
+
+```{r}
+DF3$FStart <- 1 == diff( c( 0, DF3$F ) )
+```
+```{r Stage1b, fig.margin=TRUE,fig.cap="Start of Level",echo=FALSE,fig.height=2}
+ggplot( DF3, aes( x=Dt, y=as.integer( FStart ) ) ) +
+    geom_step( direction = "hv" ) +
+    ylab( "FStart (1=start of flood)" )
+```
+
+Notice that `diff` returns a vector one shorter than the input because it makes no assumptions about how you want the beginning or end values treated. Extending `F` with a zero at the beginning allows a data set that starts out in flood conditions to be marked as starting the flood at the beginning of the data.
+
+Now, for each start of flood, start a new level:
+
+```{r}
+DF3$FNum <- cumsum( DF3$FStart )
+```
+```{r Stage1c, fig.margin=TRUE,fig.cap="Level Counter",echo=FALSE,fig.height=2}
+ggplot( DF3, aes( x=Dt, y=as.integer( FNum ) ) ) +
+    geom_step( direction = "hv" ) +
+    ylab( "FNum" )
+```
+
+Now shorten `FNum` to just the records when the level was exceeded:
+
+```{r}
+DF3$FId <- with( DF3, FNum * F )
+```
+```{r Stage1d, fig.margin=TRUE,fig.cap="Level Counter",echo=FALSE,fig.height=2}
+ggplot( DF3, aes( x=Dt, y=as.integer( FId ) ) ) +
+    geom_step( direction = "hv" ) +
+    ylab( "FId" )
+```
+
+Now we can make a factor variable for identifying flood records:
+
+```{r}
+FloodIds <- unique( DF3$FId )
+DF3$FloodStatus <- factor( DF3$FId
+                         , levels = FloodIds
+                         , labels = c( "No Flood"
+                                     , paste( "Flood"
+                                            , FloodIds[ -1 ]
+                                            )
+                                     )
+                         )
+```
+
+```{r,echo=FALSE}
+knitr::kable(DF3
+            , caption = "Table 1. Flood Identification" )
+```
+
+The factor column can be used to identify flood stage points with alternate graphical features such as color, fill, alpha (transparency) or shape.
+
+```{r Stage1e, fig.margin=TRUE,fig.cap="Flood Marking",echo=FALSE,fig.height=2}
+ggplot( DF3, aes( x=Dt, y=Stage, color = FloodStatus ) ) +
+    geom_point() +
+    geom_hline( yintercept = 10
+              , color = "red"
+              )
+```
+
+You can also wrap this up as a function so you don't end up with a bunch of extra columns in your data:
+
+```{r}
+MarkFloodStatus <- function( stage, floodlevel ) {
+    F <-floodlevel < stage
+    FStart <- 1 == diff( c( 0, F ) )
+    FNum <- cumsum( FStart )
+    FId <- FNum * F
+    FloodIds <- unique( FId )
+    FloodStatus <- factor( FId
+                         , levels = FloodIds
+                         , labels = c( "No Flood"
+                                     , paste( "Flood"
+                                            , FloodIds[ -1 ]
+                                            )
+                                     )
+                         )
+    FloodStatus
+}
+DF3b <- DF3[ 1:2 ]  # remove extra columns
+DF3b$FloodStatus <- MarkFloodStatus( DF3b$Stage, 10 )
+str( DF3b )
+```
+
+# The `tidyr` package
+
+Tables that use both rows and columns to locate data values are quite useful in many situations. However, the structure they impose is not always ideal for a couple of reasons. One is that every combination of row and column specification has a place, even if no data are available for that combination. Thus it is often convenient to store data in one column and use values entered in "key" rows to locate those values. A common term for these single-column data tables is *long*, with the alternative table referred to as *wide*. (You may have encountered this before... Excel can "pivot" long-form data into wide form using a "pivot table".)
+
+Base R has the `reshape` function which can convert long to wide, or wide to long. However, the syntax of this function is rather tricky so a few packages have been built to make this process easier, including `reshape2` and `tidyr`. The `tidyr` package was introduced a couple of years ago in Hadley Wickam's "Tidy Data" article[^1].
+
+Let's put some data into a data frame to work with:
+
+```{r}
+# long form data
+DF4a <- read.table( text=
+"X Y G
+1  2 A
+2  4 A
+3  3 A
+4  1 A
+1  1 B
+2  2 B
+3  1 B
+", header = TRUE, as.is = TRUE)
+```
+
+Figure~\ref{fig:tidyfig1} illustrates that these two curves have different numbers of points without requiring a blank or `NA` value in the data.
+
+```{r tidyfig1,fig.margin=TRUE,fig.cap="Long Data",echo=FALSE,fig.height=2}
+ggplot( DF4a, aes( x=X, y=Y, colour=G ) ) +
+    geom_line()
+```
+
+We can *widen* `DF4a` if we need to using the `tidyr` `spread` function:
+
+```{r}
+library(tidyr)
+DF4b <- (   DF4a
+        %>% spread( G, Y )
+        )
+```
+
+```{r tidywidetbl,results='as.is',echo=FALSE}
+knitr::kable( DF4b
+            , caption = "Table 1. Wide version of `DF4a`"
+            )
+```
+
+Note that as many columns as needed will be created based on the contents of the `G` column.
+
+If we need to go the other way, we can use the `gather` function, specifying the columns to collapse into `Y` as being "everything but column `X`":
+
+```{r}
+DF4c <- (   DF4b
+        %>% gather( G,  Y, -X )
+        )
+```
+
+```{r tidylongtbl,results='as.is',echo=FALSE}
+knitr::kable( DF4c
+            , caption = "Table 2. Long version of `DF4b`"
+            )
+```
+
+or we can tell `gather` not to generate the NA row:
+
+```{r}
+DF4d <- (   DF4b
+        %>% gather( G, Y, -X, na.rm = TRUE)
+        )
+```
+
+```{r tidylongtbl2,results='as.is',echo=FALSE}
+knitr::kable( DF4d
+            , caption = "Table 3. Long version of `DF4b` with no `NA` result"
+            )
+```
+
+
+# Merging data frames
+
+Often you will have a small data frame that summarizes some information, and you will want to look up certain rows/columns of data from that data frame and use it for calculations. (In Excel this is often accomplished with the `VLOOKUP` or `HLOOKUP` functions.) For example, you might have a short data frame:
+
+```{r}
+DF5lookup <- read.table( text=
+"WaterSeason Capacity Evap
+Flood        550      8
+Irrigation   250      26
+", header = TRUE, as.is = TRUE )
+```
+
+And another data frame in which you want to do some calculations:
+
+```{r}
+DF5calc <- read.table( text = 
+"Dt        Inflow  WaterSeason
+1913-10-01   72.6  Flood
+1914-04-01  233.6  Irrigation
+1914-10-01  170.9  Flood
+1915-04-01  591.4  Irrigation
+1915-10-01  118.4  Flood
+1916-04-01  406.1  Irrigation
+", header = TRUE, as.is = TRUE )
+DF5calc$Dt <- as.Date( DF5calc$Dt )
+```
+
+Suppose we want to compute $\mathit{Capacity}-\mathit{Inflow}$. We can use indexing to lookup the $\mathit{Capacity}$ corresponding to each row of `DF5calc`:
+
+```{r}
+DF5calc$Diff <- ( DF5lookup$Capacity[ match( DF5calc$WaterSeason
+                                           , DF5lookup$WaterSeason ) ]
+                - DF5calc$Inflow
+                )
+```
+
+```{r,results='as.is',echo=FALSE}
+knitr::kable( DF5calc
+            , caption = "Table 4. Calculation by indexing lookup"
+            )
+```
+
+However, this is tedious and not particularly efficient. A more efficient approach is to *merge* the tables together using the `merge` function from base R:
+
+```{r}
+DF5calc <- DF5calc[ -4 ] # drop the indexed calculation
+DF5calc2 <- merge( DF5calc, DF5lookup, by = "WaterSeason" )
+DF5calc2$Diff <- with( DF5calc2, Capacity - Inflow )
+```
+
+```{r,results='as.is',echo=FALSE}
+knitr::kable( DF5calc2
+            , caption = "Table 5. Calculation by `merge` from base R"
+            )
+```
+
+If you are using the `dplyr` package there is a more efficient alternative:
+
+```{r}
+DF5calc3 <- (   DF5calc
+            %>% inner_join( DF5lookup, by = "WaterSeason" )
+            %>% mutate( Diff = Capacity - Inflow )
+            )
+```
+
+
+```{r,results='as.is',echo=FALSE}
+knitr::kable( DF5calc3
+            , caption = "Table 6. Calculation by `inner_join` and `mutate`"
+            )
+```
+
+
+[^1]: Wickham, H., "Tidy Data", *Journal of Statistical Software*, V59N10 pp 1-23, 1994. DOI:10.18637/jss.v059.i10.
+

@@ -406,10 +406,182 @@ Keep in mind that `Vectorize`-ed form of the function does not run any faster th
 
 # Handling Time Data
 
-R has no concept of time independent of date, mostly because the number and numbering of hours in a day is different when daylight savings time starts and stops.
+R has no concept of time independent of date, mostly because the number and numbering of hours in a day is different when daylight savings time starts and stops. If you really want to process time data that has no date information then you need to assume a date so R can work with it.
 
 If you are dealing with date data (no time of day), the `Date` type can be used without concern about timezones. However, if time of day is part of your analysis then the base R method for handling that are the `POSIXlt` and `POSIXct` types that follow the (surprise) POSIX standard for timekeeping, and the `difftime` type for time intervals (time arithmetic). There are some packages that can be used if you want to ignore timezone idiosyncrasies (`zoo` and `chron` are a couple).
 
 The rest of this discussion focuses on `POSIXct`, with a little `POSIXlt` and `difftime` as well.
 
-**TODO**
+First let's read in some time data.
+
+```{r}
+tmdta1 <- read.csv( text = 
+"Hrs,DateTime1,DST1,DateTime2,DST2,DateTime2s,DST2s
+0,3/8/2015 0:00,ST,11/1/2015 0:00,DST,10/31/2015 23:00,ST
+0.25,3/8/2015 0:15,ST,11/1/2015 0:15,DST,10/31/2015 23:15,ST
+0.5,3/8/2015 0:30,ST,11/1/2015 0:30,DST,10/31/2015 23:30,ST
+0.75,3/8/2015 0:45,ST,11/1/2015 0:45,DST,10/31/2015 23:45,ST
+1,3/8/2015 1:00,ST,11/1/2015 1:00,DST,11/1/2015 0:00,ST
+1.25,3/8/2015 1:15,ST,11/1/2015 1:15,DST,11/1/2015 0:15,ST
+1.5,3/8/2015 1:30,ST,11/1/2015 1:30,DST,11/1/2015 0:30,ST
+1.75,3/8/2015 1:45,ST,11/1/2015 1:45,DST,11/1/2015 0:45,ST
+2,3/8/2015 3:00,DST,11/1/2015 1:00,ST,11/1/2015 1:00,ST
+2.25,3/8/2015 3:15,DST,11/1/2015 1:15,ST,11/1/2015 1:15,ST
+2.5,3/8/2015 3:30,DST,11/1/2015 1:30,ST,11/1/2015 1:30,ST
+2.75,3/8/2015 3:45,DST,11/1/2015 1:45,ST,11/1/2015 1:45,ST
+3,3/8/2015 4:00,DST,11/1/2015 2:00,ST,11/1/2015 2:00,ST
+", as.is=TRUE )
+str( tmdta1 )
+```
+
+The `DateTime1` and `DateTime2` columns contains characters that don't convert for all rows to numeric, and the `as.is=TRUE` option was specified, so `read.csv` left it as character data. This retains the content of the column as it was given to R, but in this form it cannot be treated like continuous data in plots, nor can time intervals be selected. If you need these features (you might not always need them), we can convert it to a data type suited to such operations.
+
+Since the `DateTime` column contains time along with date information, we cannot use the `Date` type. The `POSIXct` and `POSIXlt` types are the standard choices for these purposes that are supported by R. The `POSIXct` type is the "compact" type that is suitable for arithmetic and storing in data frames.  The `POSIXlt` type is like a miniature data frame with 9 columns representing separate parts of time (day, hour, year, etc.).
+
+The hardest part about using the `POSIX` types is dealing with time zones... but then time zones are probably also the best thing about them, too. Keep in mind that R did not invent the calendar, nor is it responsible for daylight savings time or leap days... so having a system powerful enough to handle all of those special cases for you should be considered a blessing rather than a curse.
+
+## Spring Forward
+
+Here is an example of converting to `POSIXct`:
+
+```{r}
+tmdta1$DtmCivil1 <- as.POSIXct( tmdta1$DateTime1
+                              , tz = "America/Los_Angeles"
+                              , format = "%m/%d/%Y %H:%M"
+                              )
+str( tmdta1 )
+```
+
+Note that `DtmCivil1` is printed differently than it was represented in the CSV file. This is typical, since a `POSIXct` value is represented internally as the number of seconds since some point in time ("epoch"; typically 1970-01-01 0:00 GMT), and whenever it is printed some timezone and format will have to be assumed. That timezone may be associated with that `POSIXct` vector (from the tz argument) or may be whatever is currently set as the default in your R workspace (`Sys.setenv(TZ=whatever)` if the tz for that vector is `""`). The default time format used in R is YYYY-mm-dd HH:MM:SS.
+
+The "America/Los_Angeles" time definition comes from an open-source timezone database (Olson) that is used in many Unix-based operating systems. R for Windows bundles this database with the installation package as well because supporting the built-in Windows timezone names database is too confusing for most people to adapt to. The more familiar "Pacific" or "PST" notation may or may not work for input because they are not universal... these notations are used on the west side of the Pacific ocean as well as the east (American) side. To identify which timezones are available to you, you should be able to use the `OlsonNames()` function.
+
+The `format` option specification notation is documented in the `strptime` help page in R. Note that `%m` represents month while `%M` represents minutes, and `%y` represents a two-digit year while `%Y` represents a four digit year. The use of month/day/year is also regional... day/month/year is familiar to Europeans, and year-month-day is often used as a standardized format in computer applications because it sorts well even when stored as character strings.
+
+In Figure 8-1, R demonstrates that it understands that for springtime, 3am in Daylight Savings Time is 15 minutes after 1:45am Standard Time in the `DtmCivil1` column.
+
+```{r,fig.cap="Figure 8-1. Civil Time versus Hours, Spring Forward"}
+ggplot( tmdta1, aes( x=Hrs, y=DtmCivil1 ) ) +
+  geom_point()
+```
+
+We can confirm this by calculation as well:
+
+```{r}
+tmdta1$DtmCivil1[ 8:9 ]
+deltaT1 <- tmdta1$DtmCivil1[ 9 ] - tmdta1$DtmCivil1[ 8 ]
+str( deltaT1 )
+deltaT1
+```
+
+The `deltaT1` variable is a `difftime` value that gets stored in *convenient* units. If you need to convert it to numeric for some reason, you should *always* specify the units, or it will change the units automatically as larger or smaller values are computed:
+
+```{r}
+deltaTh <- tmdta1$DtmCivil[ 9 ] - tmdta1$DtmCivil[ 5 ]
+deltaTh # User-friendly output
+as.numeric( deltaT1 )  # minutes... dangerous
+as.numeric( deltaTh ) # inconsistent with deltaT1 ... dangerous
+as.numeric( deltaT1, units="mins" )  # consistent output
+as.numeric( deltaTh, units="mins" ) # consistent output
+```
+
+## Fall Back
+
+Although the timezone definition can handle the Spring Forward case without help, most of the time the Fall Back case leads to ambiguity:
+
+```{r}
+tmdta1$DtmCivil2a <- as.POSIXct( tmdta1$DateTime2
+                               , tz = "America/Los_Angeles"
+                               , format = "%m/%d/%Y %H:%M"
+                               )
+str( tmdta1 )
+```
+
+```{r,fig.cap="Figure 8-2. Civil Time versus Hours, Fall Back is a problem"}
+ggplot( tmdta1, aes( x=Hrs, y=DtmCivil2a ) ) +
+  geom_point()
+```
+
+In Figure 8-2 we see from the y-axis that while R is prepared to understand that 1AM standard time is one hour after 1AM daylight time, the information needed to distinguish between them is not present in the `DateTime2` column so both 1AM values get assumed to be daylight savings.
+
+In this case I have cheated and created a column `DST2` that indicates whether the `DateTime2` column is daylight savings time or standard time. We can use this information to "fix" the `DtmCivil2` time if it is represented in the "long" format:
+
+```{r}
+# create a temporary variable not in the data frame
+d <- as.POSIXlt( tmdta1$DtmCivil2a )
+str( d ) # R hides the gory details
+str( unclass( d ) ) # forget the class of d
+# read the help ?DateTimeClasses
+# optional: View( unclass( d ) )
+d$isdst
+d$isdst <- ifelse( "DST" == tmdta1$DST2, 1, 0 )
+d$isdst
+tmdta1$DtmCivil2b <- as.POSIXct( d )
+```
+
+```{r,fig.cap="Figure 8-3. Civil Time versus Hours, Fall Back Fix 1"}
+ggplot( tmdta1, aes( x=Hrs, y=DtmCivil2b ) ) +
+  geom_point()
+```
+
+If we don't have the `DST2` column handy then we can simulate it somehow using knowledge about the data.  For example, if we know that the timestamp column is actually sampled regularly and monotonically, then duplicate timestamps must be in standard time;
+
+```{r}
+duplicated( tmdta1$DtmCivil2a )
+d <- as.POSIXlt( tmdta1$DtmCivil2a )
+d$isdst
+d$isdst <- ifelse( duplicated( tmdta1$DtmCivil2a )
+                 , 0
+                 , d$isdst
+                 )
+d$isdst
+tmdta1$DtmCivil2c <- as.POSIXct( d )
+```
+
+```{r,fig.cap="Figure 8-4. Civil Time versus Hours, Fall Back Fix 2"}
+ggplot( tmdta1, aes( x=Hrs, y=DtmCivil2c ) ) +
+  geom_point()
+```
+
+However, these solutions are hacks, so by far the least painful approach is to work with standard time input data as much as possible:
+
+```{r}
+tmdta1$DtmCivil2s <- as.POSIXct( tmdta1$DateTime2s
+                               , tz = "Etc/GMT+8"
+                               , format = "%m/%d/%Y %H:%M"
+                               )
+str( tmdta1 )
+```
+
+(The `+8` business doesn't make sense mathematically for zones west of GMT, but that is historically how it was represented because computer science people in the US did not want to be bothered with minus signs in their day-to-day work.)
+
+```{r,fig.cap="Figure 8-2. Civil Time versus Hours, Bypassing Fall Back"}
+ggplot( tmdta1, aes( x=Hrs, y=DtmCivil2s ) ) +
+  geom_point()
+```
+
+Dataloggers often ignore daylight savings time anyway, so this is actually a reasonable solution for many engineering applications. 
+
+## Tips on Timezones
+
+Notice that the *values* of times in each row of `tmdta1` are the same even though they are externally presented differently. For example:
+
+```{r}
+attributes( tmdta1$DtmCivil2a[ 1 ] ) # tzone America/Los_Angeles
+attributes( tmdta1$DtmCivil2s[ 1 ] ) # tzone Etc/GMT+8
+tmdta1$DtmCivil2a[ 1 ] # appears DST
+tmdta1$DtmCivil2s[ 1 ] # appears ST
+tmdta1$DtmCivil2a[ 1 ] == tmdta1$DtmCivil2s[ 1 ] # TRUE with warning
+```
+
+Be aware that each `POSIXct` or `POSIXlt` variable is a vector, and the timezone associated with that vector applies to all elements of the vector. This means that R cannot directly deal with a data frame column containing different timezones for each row. I have handled this in the past by converting each value separately and either a) keeping them in separate single-element vectors or b) putting them into one vector and displaying them using one timezone.
+
+If your analysis works entirely on one timezone you can often set your default timezone and not worry about `tz` arguments in your code. For example, to work with PST data:
+
+```{r}
+Sys.setenv( TZ = "Etc/GMT+8" ) # works on most but perhaps not all operating systems
+# read data without converting to factors
+# use as.POSIXct( dta$DateTime, format=whatever )
+# analyze and output
+```
+
