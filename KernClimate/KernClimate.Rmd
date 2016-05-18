@@ -4,7 +4,7 @@ author: "Jeff Newmiller"
 date: "5/15/2016"
 output:
     html_document:
-        fig_captions: true
+        fig_caption: true
 ---
 
 ```{r, include=FALSE}
@@ -28,7 +28,7 @@ Scheduling reservoir water releases is tricky, because if you release too much t
 
 # Input Data
 
-A two-season inflows table (note that flood season flows are lower than irrigation season flows because this data is from a high elevation were most preciptation is snow-pack):
+A two-season inflows table (note that flood season flows are lower than irrigation season flows because this data is from a high elevation where most precipitation is snow-pack):
 
 * **Year** : Water season year of water inflows (Calendar year of beginning of season)
 * **Flood** : Rainy season water inflow (thousand acre-feet)
@@ -125,11 +125,117 @@ where the first four equations capture the constraint that the amount of water t
 
 The actual problem has 413 equations and 207 variables. The equations are typically represented as a matrix of left-hand-side coefficients and a vector of inequality limits on the right-hand side. The linear programming functions help build the large matrix programmatically, and the `solve` function handles the heavy lifting of finding a solution.
 
+Figure 3 shows how the data flows through the R file to be presented in this file.
+
+```{r dtaflowfig,fig.width=7,fig.height=9}
+library(DiagrammeR)
+grViz('
+digraph KernClimate {
+  node [ shape = none ]
+  infile [ label = "\\"../data/KernClimate/KernClimate.csv\\"" ]
+  rmdfile [ label = "\\"KernClimate.Rmd\\"" ]
+  htmlfile [ label = "\\"KernClimate.html\\"" ]
+  seasonstxt [ label = "internal string" ]
+  node [ shape = box ]
+  SeasonIntervals
+  inflowhdr
+  inflows
+  flowsl
+  subgraph cluster_input{
+    label = "Input"
+    style = dashed
+    node [ shape = ellipse ]
+    readcsvhdr [ label = "read.csv()" ]
+    readcsvdta [ label = "read.csv()" ]
+    readcsvseas [ label = "read.csv(text=)" ]
+  }
+  subgraph cluster_analysis{
+    label = "Analysis"
+    style = dashed
+    node [ shape = ellipse ]
+    {
+      rank = same
+      seasgather [ label = "gather" ]
+      seasspread [ label = "spread()" ]
+      seasjoin [ label = "inner_join()" ]
+    }
+    inflgather [ label = "gather()" ]
+    {
+      rank = same
+      infljoin [ label = "inner_join" ]
+      inflmutate1 [ label = "mutate(Year=)" ]
+      inflarrange [ label = "arrange()" ]
+      inflcumsums [ label = "mutate(cumsum())" ]
+    }
+    inflmutate2 [ label = "mutate(Excess=)" ]
+    buildlpExtPtr [ label = "Build Model" ]
+    solvelpExtPtr [ label = "solve.lpExtPtr()" ]
+    getvariables [ label = "get.variables()" ]
+    getobjective [ label = "get.objective()" ]
+    node [ shape = box ]
+    inflowsl
+    caps
+    lpmodel
+  }
+  subgraph cluster_output{
+    label = "Output"
+    style = dashed
+    node [ shape = ellipse ]
+    writelp [ label = "write.lp()" ]
+    knitrmd
+  }
+
+ infile -> readcsvhdr
+ readcsvhdr -> inflowhdr
+ infile -> readcsvdta
+ readcsvdta -> inflows
+ seasonstxt -> readcsvseas 
+ readcsvseas -> SeasonIntervals
+
+ inflowhdr -> seasgather
+ seasgather -> seasspread
+ seasspread -> seasjoin
+ seasjoin -> caps
+ SeasonIntervals -> seasjoin
+ 
+ inflows -> inflgather
+ inflgather -> infljoin
+ caps -> infljoin
+ infljoin -> inflmutate1
+ inflmutate1 -> inflarrange
+ inflarrange -> inflcumsums
+ inflcumsums -> inflowsl
+
+ inflowsl -> buildlpExtPtr
+ buildlpExtPtr -> lpmodel
+ lpmodel -> solvelpExtPtr
+ solvelpExtPtr -> lpmodel
+ lpmodel -> writelp
+ writelp -> outfile
+ lpmodel -> getvariables
+ lpmodel -> getobjective
+ 
+ inflowsl -> inflmutate2
+ getvariables -> inflmutate2 [ label = "Excess" ]
+ getobjective -> inflmutate2 [ label = "Outflow" ]
+ inflmutate2 -> flowsl
+
+ flowsl -> knitrmd
+ inflowsl -> knitrmd
+ caps -> knitrmd
+ rmdfile -> knitrmd
+ knitrmd -> htmlfile
+}
+')
+```
+Figure 3. Data flow diagram of analysis
+
+
 # Firm yield
 
 The firm yield is `r get.objective( lpmodel )` TAF, solved by linear programming.
 
-```{r,fig.cap="Figure 3. Cumulative Inflow and Outflow"}
+```{r,fig.cap="Figure 4. Cumulative Inflow and Outflow"}
 DF <- (   flowsl
       %>% select( EndDate, CumInflow, CumOutFlow )
       %>% gather( Type, value, -EndDate )
@@ -143,7 +249,7 @@ ggplot( DF, aes( x=EndDate, y=value, color=Type ) ) +
 
 Storage is drained at the end of the dry season in 2015.
 
-```{r,fig.cap="Figure 4. Storage at Season End"}
+```{r,fig.cap="Figure 5. Storage at Season End"}
 DF <- (   flowsl
       %>% select( EndDate, EndCap, Storage )
       %>% gather( Type, value, -EndDate )
@@ -157,7 +263,7 @@ ggplot( DF, aes( x=EndDate, y=value, shape=Type ) ) +
 
 Spilling by the end of the irrigation season in order to prepare for flood control is quite common.
 
-```{r,fig.cap="Figure 5. Spills"}
+```{r,fig.cap="Figure 6. Spills"}
 DF <- (   flowsl
       %>% select( EndDate, EndCap, Storage, Season )
       %>% gather( Type, value, -c( EndDate, Season ) )

@@ -34,7 +34,7 @@ ggplot( floodsDFAlong, aes( x = WaterYear, y = value, color = variable ) ) +
 
 Figure 2 shows the density (smoothed histogram) for logarithm of annual maximum inflows to visually check for normality.
 
-```{r, fig.cap="Figure 2. Distributions of Log(MaxQ)"}
+```{r, fig.cap="Figure 2. Distributions of $\\log{(\\mathit{MaxQ})}$"}
 ggplot( logFloodsDFA, aes( x = logMaxInflow, color = Reservoir ) ) +
   geom_density() +
   xlim( c( 7, 13 ) )
@@ -42,7 +42,7 @@ ggplot( logFloodsDFA, aes( x = logMaxInflow, color = Reservoir ) ) +
 
 Figure 3 shows a more statistical way to check for normality using quantile-quantile plots. We expect the points to fall on the line if the data conforms with the distribution.
 
-```{r, fig.cap="Figure 3. Q-Q Plots for $\\log{MaxQ}$", fig.height=6}
+```{r, fig.cap="Figure 3. Q-Q Plots for $\\log{(\\mathit{MaxQ})}$", fig.height=6}
 # base graphics - see ?par
 oldpar <- par( mfcol = c( 3, 1 ) )
 # first part
@@ -66,3 +66,89 @@ knitr::kable( floodsLongTerm
             )
 ```
 
+# Data Flow
+
+Figure 4 shows the significant processing steps in this analysis.
+
+```{r,fig.width=7.5,fig.height=9}
+library(DiagrammeR)
+grViz('
+digraph Floods {
+  node [ shape = none ]
+  origdtadir [ label = "\\"../data/floods/original/\\"" ]
+  cleandtadir [label =  "\\"../data/floods/clean/\\"" ]
+  rmdfile [ label = "\\"floods.Rmd\\"" ]
+  htmlfile [ label = "\\"floods.html\\"" ]
+  node [ shape = box ]
+  reservoirs
+  start
+  stop
+  ffillcols
+
+  subgraph cluster_input{
+    label = "Input"
+    style = dashed
+    node [ shape = ellipse ]
+    readReservoirDaily [ label = "readReservoirDaily()" ]
+  }
+  subgraph cluster_analysis{
+    label = "Analysis"
+    style = dashed
+    node [ shape = box ]
+    floodList
+    floodListA
+    floodsDFA
+    floodsDFAlong
+    logFloodsDFA
+    floodsLongTerm
+    node [ shape = ellipse ]
+    cleanReservoirDaily [ label = "cleanReservoirDaily()" ]
+    crunchA
+    bindrows [ label = "bind_rows()" ]
+    gatherDFA [ label = "gather()" ]
+    mutateLog [ label = "mutate(log())" ]
+    groupbyReservoir [ label = "group_by(Reservoir)" ]
+  }
+  subgraph cluster_output{
+    label = "Output"
+    style = dashed
+    node [ shape = ellipse ]
+    writecsv [ label = "write.csv()" ]
+    makeReservoirFname [ label = "makeReservoirFname()" ]
+    knitrmd
+  }
+
+  reservoirs -> readReservoirDaily
+  origdtadir -> readReservoirDaily
+  readReservoirDaily -> cleanReservoirDaily
+  start -> cleanReservoirDaily
+  stop -> cleanReservoirDaily
+  ffillcols -> cleanReservoirDaily
+  
+  cleanReservoirDaily -> floodList
+  floodList -> crunchA
+  crunchA -> floodListA
+  floodListA -> bindrows
+  bindrows -> floodsDFA
+  floodsDFA -> gatherDFA
+  floodsDFA -> knitrmd
+  gatherDFA -> floodsDFAlong
+  floodsDFAlong -> knitrmd
+  floodsDFA -> mutateLog
+  mutateLog -> logFloodsDFA
+  logFloodsDFA -> knitrmd
+  floodsDFA -> groupbyReservoir
+  groupbyReservoir -> floodsLongTerm
+  floodsLongTerm -> knitrmd
+
+  reservoirs -> makeReservoirFname
+  makeReservoirFname -> writecsv
+  floodList -> writecsv
+  writecsv -> cleandtadir
+
+  rmdfile -> knitrmd
+  knitrmd -> htmlfile
+}
+')
+```
+Figure 4. Data flow for `floods` analysis
