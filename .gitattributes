@@ -17,3 +17,6 @@
 *.png binary
 *.jpg binary
 *.pdf binary
+*.Rmd linguist-language=R
+*.html linguist-documentation
+
