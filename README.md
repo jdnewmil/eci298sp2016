@@ -54,3 +54,12 @@ The QuickHowto2.html file gives some simplified examples of using the `ave`, `di
 The Handout1.pdf file is intended to be used as a study "cheat sheet" and notes in printed form.
 
 * Packages used: `tufte`, `knitr`. Also requires a system installation of XeTeX.
+
+### MaskedObjects
+
+This R file provides a guided review of how functions in one package may be
+"masked" by functions with the same name in another package, and why this
+is not normally a problem but you might need to pay attention to the warnings 
+sometimes.
+
+* Packages used: `dplyr`
