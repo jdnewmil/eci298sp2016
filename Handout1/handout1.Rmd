@@ -9,6 +9,17 @@ output:
     latex_engine: xelatex
 bibliography: Rpackages.bib
 link-citations: yes
+knit: (function(input_file, encoding) {
+   out_dir <- 'docs';
+   rmarkdown::render( input_file
+                    , encoding = encoding
+                    , output_file = file.path( dirname(input_file)
+                                             , ".."
+                                             , out_dir
+                                             , 'handout1.pdf'
+                                             )
+                    )
+   })
 ---
 
 ```{r setup, include=FALSE}

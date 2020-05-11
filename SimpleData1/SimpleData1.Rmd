@@ -4,6 +4,17 @@ author: "Jeff Newmiller"
 date: "4/21/2016"
 output: ioslides_presentation
 autosize: true
+knit: (function(input_file, encoding) {
+   out_dir <- 'docs';
+   rmarkdown::render( input_file
+                    , encoding = encoding
+                    , output_file = file.path( dirname(input_file)
+                                             , ".."
+                                             , out_dir
+                                             , 'SimpleData1.html'
+                                             )
+                    )
+   })
 ---
 
 <style>
